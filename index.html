@@ -1,56 +1,256 @@
-addEventListener("click", () => {
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Тренировки</title>
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<meta name="apple-mobile-web-app-title" content="Тренировки">
+<meta name="theme-color" content="#000000">
+<link rel="manifest" href="manifest.webmanifest">
+<style>
+  :root {
+    --bg: #000;
+    --text: #e5e5e7;
+    --dim: #8e8e93;
+    --ring: #48484a;
+    --rule: #d1d1d6;
+    --accent: #ffd60a;
+    --danger: #ff453a;
+    --bar: #1c1c1e;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; background: var(--bg); color: var(--text); }
+  body {
+    font-family: -apple-system, "SF Pro Text", "Helvetica Neue", Arial, sans-serif;
+    min-height: 100vh;
+    padding: calc(20px + env(safe-area-inset-top)) 20px 120px;
+    max-width: 640px;
+    margin: 0 auto;
+  }
+  .day { padding-bottom: 18px; margin-bottom: 18px; border-bottom: 1px solid var(--rule); }
+  .day-head { display: flex; align-items: center; gap: 10px; }
+  .day-title {
+    flex: 1; min-width: 0;
+    background: none; border: 0; outline: 0;
+    color: var(--text);
+    font: 700 30px/1.2 -apple-system, "SF Pro Display", "Helvetica Neue", Arial, sans-serif;
+    letter-spacing: -0.4px;
+    padding: 4px 0;
+  }
+  .day-count { color: var(--dim); font-size: 15px; font-variant-numeric: tabular-nums; }
+  .day-del {
+    background: none; border: 0; color: var(--dim);
+    font-size: 15px; padding: 6px 4px; cursor: pointer;
+  }
+  .day-del.armed { color: var(--danger); font-weight: 600; }
+  .item { display: flex; align-items: center; gap: 14px; padding: 9px 0; }
+  .box {
+    flex: none; width: 26px; height: 26px; border-radius: 50%;
+    border: 2px solid var(--ring); background: transparent;
+    padding: 0; cursor: pointer; position: relative;
+    transition: background .15s, border-color .15s;
+  }
+  .box::after {
+    content: ""; position: absolute; left: 7px; top: 3px;
+    width: 6px; height: 11px;
+    border: solid #000; border-width: 0 2.5px 2.5px 0;
+    transform: rotate(45deg) scale(0); transition: transform .15s;
+  }
+  .item.done .box { background: var(--accent); border-color: var(--accent); }
+  .item.done .box::after { transform: rotate(45deg) scale(1); }
+  .txt {
+    flex: 1; min-width: 0;
+    background: none; border: 0; outline: 0;
+    color: var(--text); font-size: 20px; line-height: 1.3; padding: 0;
+  }
+  .item.done .txt { color: var(--dim); text-decoration: line-through; }
+  .add {
+    display: flex; align-items: center; gap: 14px;
+    padding: 9px 0; color: var(--dim); font-size: 20px;
+    background: none; border: 0; width: 100%; text-align: left; cursor: pointer;
+  }
+  .add .plus {
+    flex: none; width: 26px; height: 26px; border-radius: 50%;
+    border: 2px dashed var(--ring);
+    display: grid; place-items: center; font-size: 18px; line-height: 1; padding-bottom: 2px;
+  }
+  .bar {
+    position: fixed; left: 50%; transform: translateX(-50%);
+    bottom: calc(18px + env(safe-area-inset-bottom));
+    display: flex; gap: 6px; padding: 6px;
+    background: var(--bar); border-radius: 999px;
+    box-shadow: 0 6px 24px rgba(0,0,0,.6);
+  }
+  .btn {
+    background: none; border: 0; color: var(--text);
+    font: 500 16px -apple-system, sans-serif;
+    padding: 12px 18px; border-radius: 999px; cursor: pointer;
+  }
+  .btn:active { background: #2c2c2e; }
+  .btn.primary { color: var(--accent); }
+</style>
+</head>
+<body>
+<main id="app"></main>
+<div class="bar">
+  <button class="btn primary" id="addDay">Новый день</button>
+  <button class="btn" id="resetChecks">Снять галочки</button>
+</div>
+
+<script>
+// Иконка для экрана «Домой» рисуется здесь же
+(function () {
+  try {
+    var c = document.createElement("canvas");
+    c.width = 180; c.height = 180;
+    var x = c.getContext("2d");
+    x.fillStyle = "#000"; x.fillRect(0, 0, 180, 180);
+    x.fillStyle = "#ffd60a"; x.beginPath(); x.arc(90, 90, 56, 0, Math.PI * 2); x.fill();
+    x.strokeStyle = "#000"; x.lineWidth = 13; x.lineCap = "round"; x.lineJoin = "round";
+    x.beginPath(); x.moveTo(64, 92); x.lineTo(84, 114); x.lineTo(120, 70); x.stroke();
+    var l = document.createElement("link");
+    l.rel = "apple-touch-icon";
+    l.href = c.toDataURL("image/png");
+    document.head.appendChild(l);
+  } catch (e) {}
+})();
+
+var KEY = "workout-notes-v1";
+function uid() { return Math.random().toString(36).slice(2, 9); }
+
+var days = [
+  { id: uid(), title: "Wed. Oct. 7", items: [
+    { id: uid(), text: "Жим лежа 20х20 40х8…", done: false },
+    { id: uid(), text: "Бобочка 70x8x4", done: false }
+  ]},
+  { id: uid(), title: "Fri. Oct. 8", items: [
+    { id: uid(), text: "Выпады 40x12x4", done: false },
+    { id: uid(), text: "Жим ногами 350x10x4", done: false }
+  ]}
+];
+
+var saveTimer = null;
+var armedDay = null;
+var armedTimer = null;
+
+async function load() {
+  var raw = null;
+  try {
+    var r = await window.storage.get(KEY);
+    if (r && r.value) raw = r.value;
+  } catch (e) {}
+  if (!raw) {
+    try { raw = localStorage.getItem(KEY); } catch (e) {}
+  }
+  if (raw) {
+    try { days = JSON.parse(raw); } catch (e) {}
+  }
+  render();
+}
+
+function save() {
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(async function () {
+    var data = JSON.stringify(days);
+    try { await window.storage.set(KEY, data); return; } catch (e) {}
+    try { localStorage.setItem(KEY, data); } catch (e) {}
+  }, 300);
+}
+
+function el(tag, cls, props) {
+  var n = document.createElement(tag);
+  if (cls) n.className = cls;
+  if (props) Object.assign(n, props);
+  return n;
+}
+
+function focusItem(itemId, atEnd) {
+  var inp = document.querySelector('[data-item="' + itemId + '"]');
+  if (inp) {
+    inp.focus();
+    if (atEnd) inp.setSelectionRange(inp.value.length, inp.value.length);
+  }
+}
+
+function render() {
+  var app = document.getElementById("app");
+  app.innerHTML = "";
+
+  days.forEach(function (day) {
+    var wrap = el("section", "day");
+
+    var head = el("div", "day-head");
+    var title = el("input", "day-title", { value: day.title, placeholder: "Дата или название" });
+    title.addEventListener("input", function () { day.title = title.value; save(); });
+    head.appendChild(title);
+
+    var count = el("span", "day-count");
+    function updateCount() {
+      var d = day.items.filter(function (i) { return i.done; }).length;
+      count.textContent = day.items.length ? d + "/" + day.items.length : "";
+    }
+    updateCount();
+    head.appendChild(count);
+
+    var armed = armedDay === day.id;
+    var del = el("button", "day-del" + (armed ? " armed" : ""), { textContent: armed ? "Удалить?" : "Удалить" });
+    del.addEventListener("click", function () {
       if (armedDay === day.id) {
-        days = days.filter(d => d.id !== day.id);
+        days = days.filter(function (d) { return d.id !== day.id; });
         armedDay = null; save(); render();
       } else {
         armedDay = day.id;
         clearTimeout(armedTimer);
-        armedTimer = setTimeout(() => { armedDay = null; render(); }, 3000);
+        armedTimer = setTimeout(function () { armedDay = null; render(); }, 3000);
         render();
       }
     });
     head.appendChild(del);
     wrap.appendChild(head);
 
-    day.items.forEach((item, idx) => {
-      const row = el("div", "item" + (item.done ? " done" : ""));
+    day.items.forEach(function (item, idx) {
+      var row = el("div", "item" + (item.done ? " done" : ""));
 
-      const box = el("button", "box");
+      var box = el("button", "box");
       box.setAttribute("aria-label", "Отметить выполненным");
       box.setAttribute("aria-pressed", String(item.done));
-      box.addEventListener("click", () => {
+      box.addEventListener("click", function () {
         item.done = !item.done;
         row.classList.toggle("done", item.done);
         box.setAttribute("aria-pressed", String(item.done));
         updateCount(); save();
       });
 
-      const inp = el("input", "txt", { value: item.text, placeholder: "Упражнение" });
+      var inp = el("input", "txt", { value: item.text, placeholder: "Упражнение" });
       inp.dataset.item = item.id;
-      inp.addEventListener("input", () => { item.text = inp.value; save(); });
-      inp.addEventListener("keydown", e => {
+      inp.addEventListener("input", function () { item.text = inp.value; save(); });
+      inp.addEventListener("keydown", function (e) {
         if (e.key === "Enter") {
           e.preventDefault();
-          const n = { id: uid(), text: "", done: false };
+          var n = { id: uid(), text: "", done: false };
           day.items.splice(idx + 1, 0, n);
           save(); render(); focusItem(n.id);
         } else if (e.key === "Backspace" && inp.value === "") {
           e.preventDefault();
           day.items.splice(idx, 1);
-          const prev = day.items[idx - 1];
+          var prev = day.items[idx - 1];
           save(); render();
           if (prev) focusItem(prev.id, true);
         }
       });
 
-      row.append(box, inp);
+      row.appendChild(box);
+      row.appendChild(inp);
       wrap.appendChild(row);
     });
 
-    const add = el("button", "add");
+    var add = el("button", "add");
     add.innerHTML = '<span class="plus">+</span><span>Добавить упражнение</span>';
-    add.addEventListener("click", () => {
-      const n = { id: uid(), text: "", done: false };
+    add.addEventListener("click", function () {
+      var n = { id: uid(), text: "", done: false };
       day.items.push(n);
       save(); render(); focusItem(n.id);
     });
@@ -60,24 +260,24 @@ addEventListener("click", () => {
   });
 
   if (days.length === 0) {
-    const empty = el("p", "", { textContent: "Пока пусто. Нажми «Новый день», чтобы начать план." });
+    var empty = el("p", "", { textContent: "Пока пусто. Нажми «Новый день», чтобы начать план." });
     empty.style.color = "var(--dim)";
     empty.style.fontSize = "18px";
     app.appendChild(empty);
   }
 }
 
-const MONTH_KEYS = ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"];
-const MONTH_LABELS = ["Jan.", "Feb.", "Mar.", "Apr.", "May", "June", "July", "Aug.", "Sept.", "Oct.", "Nov.", "Dec."];
-const WEEKDAY_LABELS = ["Sun.", "Mon.", "Tue.", "Wed.", "Thu.", "Fri.", "Sat."];
+var MONTH_KEYS = ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"];
+var MONTH_LABELS = ["Jan.", "Feb.", "Mar.", "Apr.", "May", "June", "July", "Aug.", "Sept.", "Oct.", "Nov.", "Dec."];
+var WEEKDAY_LABELS = ["Sun.", "Mon.", "Tue.", "Wed.", "Thu.", "Fri.", "Sat."];
 
-// Достаёт дату из заголовка вида "Wed. Oct. 7" и возвращает следующий день
+// Берёт дату из заголовка вида "Wed. Oct. 7" и возвращает следующий день
 function nextDateAfter(title) {
-  const m = /([a-z]{3})[a-z]*\.?\s*(\d{1,2})/i.exec(title || "");
+  var m = /([a-z]{3})[a-z]*\.?\s*(\d{1,2})/i.exec(title || "");
   if (m) {
-    const mi = MONTH_KEYS.indexOf(m[1].toLowerCase());
+    var mi = MONTH_KEYS.indexOf(m[1].toLowerCase());
     if (mi !== -1) {
-      const d = new Date(new Date().getFullYear(), mi, parseInt(m[2], 10));
+      var d = new Date(new Date().getFullYear(), mi, parseInt(m[2], 10));
       d.setDate(d.getDate() + 1);
       return d;
     }
@@ -85,29 +285,30 @@ function nextDateAfter(title) {
   return new Date();
 }
 
-document.getElementById("addDay").addEventListener("click", () => {
-  const last = days.length ? days[days.length - 1].title : "";
-  const d = nextDateAfter(last);
-  const wd = WEEKDAY_LABELS[d.getDay()];
-  const mo = MONTH_LABELS[d.getMonth()];
-  const n = { id: uid(), title: wd + " " + mo + " " + d.getDate(), items: [{ id: uid(), text: "", done: false }] };
+document.getElementById("addDay").addEventListener("click", function () {
+  var last = days.length ? days[days.length - 1].title : "";
+  var d = nextDateAfter(last);
+  var n = {
+    id: uid(),
+    title: WEEKDAY_LABELS[d.getDay()] + " " + MONTH_LABELS[d.getMonth()] + " " + d.getDate(),
+    items: [{ id: uid(), text: "", done: false }]
+  };
   days.push(n);
   save(); render();
   focusItem(n.items[0].id);
   window.scrollTo({ top: document.body.scrollHeight, behavior: "smooth" });
 });
 
-document.getElementById("resetChecks").addEventListener("click", () => {
-  days.forEach(d => d.items.forEach(i => i.done = false));
+document.getElementById("resetChecks").addEventListener("click", function () {
+  days.forEach(function (d) { d.items.forEach(function (i) { i.done = false; }); });
   save(); render();
 });
 
 if ("serviceWorker" in navigator) {
-  navigator.serviceWorker.register("./sw.js").catch(() => {});
+  navigator.serviceWorker.register("./sw.js").catch(function () {});
 }
 
 load();
 </script>
-
 </body>
 </html>
