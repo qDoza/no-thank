@@ -10,6 +10,7 @@
 <meta name="apple-mobile-web-app-title" content="Тренировки">
 <meta name="theme-color" content="#000000">
 <link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
 <style>
   :root {
     --bg: #000;
@@ -22,7 +23,7 @@
     --bar: #1c1c1e;
   }
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-  html, body { margin: 0; background: var(--bg); color: var(--text); }
+  html, body { margin: 0; background: var(--bg); color: var(--text); touch-action: manipulation; }
   body {
     font-family: -apple-system, "SF Pro Text", "Helvetica Neue", Arial, sans-serif;
     min-height: 100vh;
@@ -88,6 +89,7 @@
     background: none; border: 0; color: var(--text);
     font: 500 16px -apple-system, sans-serif;
     padding: 12px 18px; border-radius: 999px; cursor: pointer;
+    white-space: nowrap;
   }
   .btn:active { background: #2c2c2e; }
   .btn.primary { color: var(--accent); }
@@ -101,23 +103,6 @@
 </div>
 
 <script>
-// Иконка для экрана «Домой» рисуется здесь же
-(function () {
-  try {
-    var c = document.createElement("canvas");
-    c.width = 180; c.height = 180;
-    var x = c.getContext("2d");
-    x.fillStyle = "#000"; x.fillRect(0, 0, 180, 180);
-    x.fillStyle = "#ffd60a"; x.beginPath(); x.arc(90, 90, 56, 0, Math.PI * 2); x.fill();
-    x.strokeStyle = "#000"; x.lineWidth = 13; x.lineCap = "round"; x.lineJoin = "round";
-    x.beginPath(); x.moveTo(64, 92); x.lineTo(84, 114); x.lineTo(120, 70); x.stroke();
-    var l = document.createElement("link");
-    l.rel = "apple-touch-icon";
-    l.href = c.toDataURL("image/png");
-    document.head.appendChild(l);
-  } catch (e) {}
-})();
-
 var KEY = "workout-notes-v1";
 function uid() { return Math.random().toString(36).slice(2, 9); }
 
@@ -153,12 +138,22 @@ async function load() {
 
 function save() {
   clearTimeout(saveTimer);
-  saveTimer = setTimeout(async function () {
-    var data = JSON.stringify(days);
-    try { await window.storage.set(KEY, data); return; } catch (e) {}
-    try { localStorage.setItem(KEY, data); } catch (e) {}
-  }, 300);
+  saveTimer = setTimeout(flush, 300);
 }
+
+async function flush() {
+  clearTimeout(saveTimer);
+  saveTimer = null;
+  var data = JSON.stringify(days);
+  try { await window.storage.set(KEY, data); return; } catch (e) {}
+  try { localStorage.setItem(KEY, data); } catch (e) {}
+}
+
+// Сохраняем сразу, если приложение свернули или закрыли
+document.addEventListener("visibilitychange", function () {
+  if (document.visibilityState === "hidden" && saveTimer) flush();
+});
+window.addEventListener("pagehide", function () { if (saveTimer) flush(); });
 
 function el(tag, cls, props) {
   var n = document.createElement(tag);
@@ -204,7 +199,14 @@ function render() {
       } else {
         armedDay = day.id;
         clearTimeout(armedTimer);
-        armedTimer = setTimeout(function () { armedDay = null; render(); }, 3000);
+        armedTimer = setTimeout(function () {
+          armedDay = null;
+          // Без render(), чтобы не сбить ввод, если в это время что-то печатаешь
+          document.querySelectorAll(".day-del.armed").forEach(function (b) {
+            b.classList.remove("armed");
+            b.textContent = "Удалить";
+          });
+        }, 3000);
         render();
       }
     });
